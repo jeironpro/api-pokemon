@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import SQLModel, Session, select
 from database.connection import engine, obtener_db
 from models.Pokemon import Pokemon, PokemonRequest, TipoPokemon, TipoPokemonEnlace, EstadisticasPokemon, PokemonResponse
@@ -11,13 +12,26 @@ app = FastAPI(
     version="1.0"
 )
 
+origins = [
+    "http://127.0.0.1:5500",
+    "http://localhost:5500"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Crear las tablas al iniciar el servidor
 @app.on_event("startup")
 def on_startup():
     SQLModel.metadata.create_all(engine)
 
 @app.post("/agregar_pokemon", response_model=dict, tags=["Agregar pokemon"])
-def agregar_pokemon(pokemon: PokemonRequest, db: Session = Depends(obtener_db)):
+async def agregar_pokemon(pokemon: PokemonRequest, db: Session = Depends(obtener_db)):
     nuevo_pokemon = Pokemon(nombre=pokemon.nombre, descripcion=pokemon.descripcion)
     db.add(nuevo_pokemon)
     db.flush()
@@ -50,7 +64,7 @@ def agregar_pokemon(pokemon: PokemonRequest, db: Session = Depends(obtener_db)):
     return {"msg": "Pokemon creado correctamente"}
 
 @app.get("/pokemones", response_model=List[PokemonResponse], tags=["Obtener pokemones"])
-def obtener_pokemones(db: Session = Depends(obtener_db)):
+async def obtener_pokemones(db: Session = Depends(obtener_db)):
     consulta = (
         select(Pokemon)
         .options(
@@ -63,13 +77,13 @@ def obtener_pokemones(db: Session = Depends(obtener_db)):
     return pokemones
 
 @app.get("/pokemon_id", response_model=PokemonResponse, tags=["Obtener pokemon por id"])
-def obtener_pokemon_id(id: int, db: Session = Depends(obtener_db)):
+async def obtener_pokemon_id(id: int, db: Session = Depends(obtener_db)):
     consulta = select(Pokemon).where(Pokemon.id == id)
     pokemon = db.exec(consulta).first()
     return pokemon
 
 @app.get("/pokemones_tipo", response_model=List[PokemonResponse], tags=["Obtener pokemones por tipo"])
-def obtener_pokemones_tipo(tipo: str, db: Session = Depends(obtener_db)):
+async def obtener_pokemones_tipo(tipo: str, db: Session = Depends(obtener_db)):
     consulta = (
         select(Pokemon)
         .join(Pokemon.tipos)
